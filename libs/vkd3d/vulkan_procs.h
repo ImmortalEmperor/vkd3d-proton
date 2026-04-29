@@ -266,6 +266,16 @@ VK_DEVICE_EXT_PFN(vkGetSemaphoreWin32HandleKHR)
 VK_DEVICE_EXT_PFN(vkImportSemaphoreWin32HandleKHR)
 #endif
 
+#ifdef VK_KHR_external_memory_fd
+/* VK_KHR_external_memory_fd */
+VK_DEVICE_EXT_PFN(vkGetMemoryFdKHR)
+#endif
+
+#ifdef VK_KHR_external_semaphore_fd
+/* VK_KHR_external_semaphore_fd */
+VK_DEVICE_EXT_PFN(vkGetSemaphoreFdKHR)
+#endif
+
 /* VK_EXT_conditional_rendering */
 VK_DEVICE_EXT_PFN(vkCmdBeginConditionalRenderingEXT)
 VK_DEVICE_EXT_PFN(vkCmdEndConditionalRenderingEXT)

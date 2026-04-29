@@ -105,6 +105,23 @@ interface ID3D12DXVKInteropDevice3 : ID3D12DXVKInteropDevice2
 }
 
 [
+    uuid(7bf3d1e2-9ca5-4f32-8e8a-d5b6f4a90c11),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12DXVKInteropDevice4 : ID3D12DXVKInteropDevice3
+{
+    /* Used to match a vkd3d-proton adapter to a CUDA device. */
+    HRESULT GetAdapterUUID(BYTE *uuid);
+
+    /* Exports the resource's memory as an fd for CUDA to import. The caller must
+     * close the fd. Returns E_FAIL if the memory can't be exported. */
+    HRESULT GetVulkanResourceFdMemoryInfo(ID3D12Resource *resource,
+            int *out_fd, UINT64 *out_offset, UINT64 *out_size);
+}
+
+[
     uuid(f3112584-41f9-348d-a59b-00b7e1d285d6),
     object,
     local,

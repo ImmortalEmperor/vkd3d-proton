@@ -1145,7 +1145,64 @@ static HRESULT STDMETHODCALLTYPE d3d12_dxvk_interop_device_GetVulkanHeapInfo(d3d
     return S_OK;
 }
 
-CONST_VTBL struct ID3D12DXVKInteropDevice3Vtbl d3d12_dxvk_interop_device_vtbl =
+static HRESULT STDMETHODCALLTYPE d3d12_dxvk_interop_device_GetAdapterUUID(d3d12_dxvk_interop_device_iface *iface, BYTE *uuid)
+{
+    struct d3d12_device *device = d3d12_device_from_ID3D12DXVKInteropDevice(iface);
+
+    TRACE("iface %p, uuid %p.\n", iface, uuid);
+
+    if (!uuid)
+        return E_INVALIDARG;
+
+    memcpy(uuid, device->device_info.vulkan_1_1_properties.deviceUUID, VK_UUID_SIZE);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_dxvk_interop_device_GetVulkanResourceFdMemoryInfo(
+        d3d12_dxvk_interop_device_iface *iface, ID3D12Resource *resource,
+        int *out_fd, UINT64 *out_offset, UINT64 *out_size)
+{
+    struct d3d12_device *device = d3d12_device_from_ID3D12DXVKInteropDevice(iface);
+    struct d3d12_resource *resource_impl;
+    VkMemoryGetFdInfoKHR info;
+    const struct vkd3d_vk_device_procs *vk_procs;
+    VkResult vr;
+
+    TRACE("iface %p, resource %p, out_fd %p, out_offset %p, out_size %p.\n",
+            iface, resource, out_fd, out_offset, out_size);
+
+    if (!resource || !out_fd || !out_offset || !out_size)
+        return E_INVALIDARG;
+
+    if (!device->vk_info.KHR_external_memory_fd)
+    {
+        WARN("VK_KHR_external_memory_fd not enabled.\n");
+        return E_FAIL;
+    }
+
+    resource_impl = impl_from_ID3D12Resource(resource);
+    if (resource_impl->mem.device_allocation.vk_memory == VK_NULL_HANDLE)
+        return E_FAIL;
+
+    vk_procs = &device->vk_procs;
+
+    info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+    info.pNext = NULL;
+    info.memory = resource_impl->mem.device_allocation.vk_memory;
+    info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    if ((vr = VK_CALL(vkGetMemoryFdKHR(device->vk_device, &info, out_fd))) != VK_SUCCESS)
+    {
+        WARN("vkGetMemoryFdKHR failed, vr %d.\n", vr);
+        return E_FAIL;
+    }
+
+    *out_offset = resource_impl->mem.offset;
+    *out_size = resource_impl->mem.resource.size;
+    return S_OK;
+}
+
+CONST_VTBL struct ID3D12DXVKInteropDevice4Vtbl d3d12_dxvk_interop_device_vtbl =
 {
     /* IUnknown methods */
     d3d12_dxvk_interop_device_QueryInterface,
@@ -1177,6 +1234,10 @@ CONST_VTBL struct ID3D12DXVKInteropDevice3Vtbl d3d12_dxvk_interop_device_vtbl =
 
     /* ID3D12DXVKInteropDevice3 methods */
     d3d12_dxvk_interop_device_GetVulkanHeapInfo,
+
+    /* ID3D12DXVKInteropDevice4 methods */
+    d3d12_dxvk_interop_device_GetAdapterUUID,
+    d3d12_dxvk_interop_device_GetVulkanResourceFdMemoryInfo,
 };
 
 void d3d12_device_notify_vk_swapchain_creation(struct d3d12_device *device, struct dxgi_vk_swap_chain *chain)

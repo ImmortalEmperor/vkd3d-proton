@@ -139,6 +139,8 @@ struct vkd3d_vulkan_info
     bool KHR_external_semaphore_win32;
     bool KHR_present_wait2;
     bool KHR_present_id2;
+    bool KHR_external_memory_fd;
+    bool KHR_external_semaphore_fd;
     bool KHR_present_wait;
     bool KHR_present_id;
     bool KHR_maintenance5;
@@ -5542,7 +5544,7 @@ struct vkd3d_timestamp_profiler;
 typedef ID3D12DeviceExt5 d3d12_device_vkd3d_ext_iface;
 
 /* ID3D12DXVKInteropDevice */
-typedef ID3D12DXVKInteropDevice3 d3d12_dxvk_interop_device_iface;
+typedef ID3D12DXVKInteropDevice4 d3d12_dxvk_interop_device_iface;
 
 /* ID3DLowLatencyDevice */
 typedef ID3DLowLatencyDevice d3d_low_latency_device_iface;

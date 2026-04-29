@@ -760,9 +760,20 @@ static HRESULT vkd3d_get_image_create_info(struct d3d12_device *device,
 
     if (resource && (resource->heap_flags & D3D12_HEAP_FLAG_SHARED))
     {
-        external_info->sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-        external_info->handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-        vk_prepend_struct(image_info, external_info);
+        VkExternalMemoryHandleTypeFlags handle_types = 0;
+        /* Host CUDA can't import a Wine HANDLE, so prefer an fd. _WIN32 can't decide
+         * this, because this PE build also runs under Wine. Must match the export type
+         * in d3d12_resource_create_committed. */
+        if (device->vk_info.KHR_external_memory_fd)
+            handle_types = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+        else if (device->vk_info.KHR_external_memory_win32)
+            handle_types = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        if (handle_types)
+        {
+            external_info->sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+            external_info->handleTypes = handle_types;
+            vk_prepend_struct(image_info, external_info);
+        }
     }
 
     disable_compression = false;
@@ -4461,30 +4472,52 @@ HRESULT d3d12_resource_create_committed(struct d3d12_device *device, const D3D12
 
         if (heap_flags & D3D12_HEAP_FLAG_SHARED)
         {
-#ifdef _WIN32
-            dedicated_requirements.prefersDedicatedAllocation = VK_TRUE;
-
-            if (shared_handle && shared_handle != INVALID_HANDLE_VALUE)
+            /* Must match the handle type in vkd3d_get_image_create_info. */
+            if (device->vk_info.KHR_external_memory_fd)
             {
-                import_info.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
-                import_info.pNext = allocate_info.pNext;
-                import_info.handleType = ((UINT_PTR)shared_handle & 0xc0000000)
-                        ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT
-                        : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-                import_info.handle = shared_handle;
-                import_info.name = NULL;
-                allocate_info.pNext = &import_info;
+                dedicated_requirements.prefersDedicatedAllocation = VK_TRUE;
+
+                if (shared_handle && shared_handle != INVALID_HANDLE_VALUE)
+                {
+                    FIXME("Importing Win32 shared handles is not supported with the FD path.\n");
+                }
+                else
+                {
+                    export_info.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+                    export_info.pNext = allocate_info.pNext;
+                    export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+                    allocate_info.pNext = &export_info;
+                }
             }
+#ifdef _WIN32
+            else if (device->vk_info.KHR_external_memory_win32)
+            {
+                dedicated_requirements.prefersDedicatedAllocation = VK_TRUE;
+
+                if (shared_handle && shared_handle != INVALID_HANDLE_VALUE)
+                {
+                    import_info.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
+                    import_info.pNext = allocate_info.pNext;
+                    import_info.handleType = ((UINT_PTR)shared_handle & 0xc0000000)
+                            ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT
+                            : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+                    import_info.handle = shared_handle;
+                    import_info.name = NULL;
+                    allocate_info.pNext = &import_info;
+                }
+                else
+                {
+                    export_info.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+                    export_info.pNext = allocate_info.pNext;
+                    export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+                    allocate_info.pNext = &export_info;
+                }
+            }
+#endif
             else
             {
-                export_info.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
-                export_info.pNext = allocate_info.pNext;
-                export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-                allocate_info.pNext = &export_info;
+                FIXME("D3D12_HEAP_FLAG_SHARED requires VK_KHR_external_memory_fd or _win32.\n");
             }
-#else
-            FIXME("D3D12_HEAP_FLAG_SHARED can only be implemented in native Win32.\n");
-#endif
         }
 
         /* Requires implies that prefers is also set by spec. */

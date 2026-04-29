@@ -107,6 +107,9 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION_COND(KHR_DEVICE_FAULT, KHR_device_fault, VKD3D_CONFIG_FLAG_STATIC(FAULT)),
     VK_EXTENSION_COND(KHR_SHADER_ABORT, KHR_shader_abort, VKD3D_CONFIG_FLAG_STATIC(FAULT)),
     VK_EXTENSION_COND(KHR_SHADER_CONSTANT_DATA, KHR_shader_constant_data, VKD3D_CONFIG_FLAG_STATIC(FAULT)),
+    /* For CUDA interop under Wine. Optional, so native Windows is unaffected. */
+    VK_EXTENSION(KHR_EXTERNAL_MEMORY_FD, KHR_external_memory_fd),
+    VK_EXTENSION(KHR_EXTERNAL_SEMAPHORE_FD, KHR_external_semaphore_fd),
     /* EXT extensions */
     VK_EXTENSION(EXT_CONDITIONAL_RENDERING, EXT_conditional_rendering),
     VK_EXTENSION(EXT_CONSERVATIVE_RASTERIZATION, EXT_conservative_rasterization),
@@ -3751,7 +3754,8 @@ HRESULT STDMETHODCALLTYPE d3d12_device_QueryInterface(d3d12_device_iface *iface,
     if (IsEqualGUID(riid, &IID_ID3D12DXVKInteropDevice)
             || IsEqualGUID(riid, &IID_ID3D12DXVKInteropDevice1)
             || IsEqualGUID(riid, &IID_ID3D12DXVKInteropDevice2)
-            || IsEqualGUID(riid, &IID_ID3D12DXVKInteropDevice3))
+            || IsEqualGUID(riid, &IID_ID3D12DXVKInteropDevice3)
+            || IsEqualGUID(riid, &IID_ID3D12DXVKInteropDevice4))
     {
         d3d12_dxvk_interop_device_AddRef(&device->ID3D12DXVKInteropDevice_iface);
         *object = &device->ID3D12DXVKInteropDevice_iface;
@@ -10521,7 +10525,7 @@ static void d3d12_device_replace_vtable(struct d3d12_device *device)
 }
 
 extern CONST_VTBL struct ID3D12DeviceExt5Vtbl d3d12_device_vkd3d_ext_vtbl;
-extern CONST_VTBL struct ID3D12DXVKInteropDevice3Vtbl d3d12_dxvk_interop_device_vtbl;
+extern CONST_VTBL struct ID3D12DXVKInteropDevice4Vtbl d3d12_dxvk_interop_device_vtbl;
 extern CONST_VTBL struct ID3DLowLatencyDeviceVtbl d3d_low_latency_device_vtbl;
 extern CONST_VTBL struct IAmdExtAntiLagApiVtbl d3d_amd_ext_anti_lag_vtbl;
 
